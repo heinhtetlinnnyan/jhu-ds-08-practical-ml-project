@@ -1,0 +1,117 @@
+---
+title: "PracticalMachineLearningFinalProject"
+author: "Hein"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## A summary
+
+Cleaned the data down to 52 sensor readings, trained a random forest on 70% of it with 5-fold cross-validation, 
+tested it on the held-out 30%.
+
+Results
+
+1. Cross-validation accuracy: 99.18% (best mtry = 27)
+2. Held-out validation accuracy: 99.42%
+3. Out-of-sample error: 0.58%
+4. Errors: 34 out of 5,885 rows
+
+What it predicts: which of five ways a barbell curl was performed. 
+A is correct form; B–E are four specific mistakes. Weakest class is C (15 misses, mostly called B). Strongest is E (1 miss).
+
+The 20 test cases: B A B A A E D B A A B C B A E E A B B B
+
+At 0.58% error, roughly 89% chance all 20 are right.
+
+One caveat for the writeup: all 6 participants appear in both splits, so 0.58% is honest for these people but would be optimistic for a new person.
+
+```{r}
+#load the data.
+library(caret)
+library(randomForest)
+set.seed(1234)
+
+if (!dir.exists("data")) dir.create("data")
+
+train_file <- "data/pml-training.csv"
+test_file  <- "data/pml-testing.csv"
+
+if (!file.exists(train_file)) {
+        download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",
+                      train_file)
+}
+if (!file.exists(test_file)) {
+        download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",
+                      test_file)
+}
+
+training <- read.csv(train_file, na.strings = c("NA", "", "#DIV/0!"))
+testing  <- read.csv(test_file,  na.strings = c("NA", "", "#DIV/0!"))
+
+dim(training); dim(testing)
+table(training$classe)
+
+#drop book keeping columns and NA columns and near zero variances columns
+training <- training[, -(1:7)]
+testing  <- testing[,  -(1:7)]
+
+
+na_prop <- colMeans(is.na(training))
+keep    <- na_prop < 0.95
+training <- training[, keep]
+testing  <- testing[,  keep]
+
+
+nzv <- nearZeroVar(training)
+if (length(nzv) > 0) {
+        training <- training[, -nzv]
+        testing  <- testing[,  -nzv]
+}
+
+training$classe <- factor(training$classe)
+dim(training); dim(testing)
+
+#split and train
+
+set.seed(1234)
+inTrain   <- createDataPartition(training$classe, p = 0.7, list = FALSE)
+train_set <- training[inTrain, ]
+valid_set <- training[-inTrain, ]
+
+ctrl <- trainControl(method = "cv", number = 5)
+
+set.seed(1234)
+fit_rf <- train(classe ~ ., data = train_set, method = "rf",
+                trControl = ctrl, ntree = 100)
+
+cat("\n--- Random Forest: Cross-Validation Results ---\n")
+print(fit_rf)
+cat("Best mtry:", fit_rf$bestTune$mtry, "\n")
+cat("CV Accuracy:", round(max(fit_rf$results$Accuracy), 4), "\n")
+
+#validation
+
+pred_valid <- predict(fit_rf, newdata = valid_set)
+cm         <- confusionMatrix(pred_valid, valid_set$classe)
+
+cat("\n--- Validation Set Performance ---\n")
+print(cm$table)
+cat("Accuracy:", round(cm$overall["Accuracy"], 4), "\n")
+cat("Out-of-Sample Error:", round(1 - cm$overall["Accuracy"], 4), "\n")
+
+plot(varImp(fit_rf), top = 15)
+
+#20 test case Prediction
+pred_test <- predict(fit_rf, newdata = testing)
+
+cat("\n--- Predictions for 20 Test Cases ---\n")
+print(data.frame(problem_id = testing$problem_id, prediction = pred_test))
+
+```
+
+
