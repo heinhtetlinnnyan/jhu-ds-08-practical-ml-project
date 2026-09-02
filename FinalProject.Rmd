@@ -30,8 +30,9 @@ At 0.58% error, roughly 89% chance all 20 are right.
 
 One caveat for the writeup: all 6 participants appear in both splits, so 0.58% is honest for these people but would be optimistic for a new person.
 
+### load the data.
 ```{r}
-#load the data.
+
 library(caret)
 library(randomForest)
 set.seed(1234)
@@ -55,8 +56,11 @@ testing  <- read.csv(test_file,  na.strings = c("NA", "", "#DIV/0!"))
 
 dim(training); dim(testing)
 table(training$classe)
+```
 
-#drop book keeping columns and NA columns and near zero variances columns
+### Drop- book keeping columns and NA columns and near zero variances columns
+
+```{r}
 training <- training[, -(1:7)]
 testing  <- testing[,  -(1:7)]
 
@@ -75,9 +79,10 @@ if (length(nzv) > 0) {
 
 training$classe <- factor(training$classe)
 dim(training); dim(testing)
+```
 
-#split and train
-
+### Split and Train
+```{r}
 set.seed(1234)
 inTrain   <- createDataPartition(training$classe, p = 0.7, list = FALSE)
 train_set <- training[inTrain, ]
@@ -94,8 +99,10 @@ print(fit_rf)
 cat("Best mtry:", fit_rf$bestTune$mtry, "\n")
 cat("CV Accuracy:", round(max(fit_rf$results$Accuracy), 4), "\n")
 
-#validation
+```
+### Validation
 
+```{r}
 pred_valid <- predict(fit_rf, newdata = valid_set)
 cm         <- confusionMatrix(pred_valid, valid_set$classe)
 
@@ -105,8 +112,11 @@ cat("Accuracy:", round(cm$overall["Accuracy"], 4), "\n")
 cat("Out-of-Sample Error:", round(1 - cm$overall["Accuracy"], 4), "\n")
 
 plot(varImp(fit_rf), top = 15)
+```
 
-#20 test case Prediction
+### Twenty test case Prediction
+
+```{r}
 pred_test <- predict(fit_rf, newdata = testing)
 
 cat("\n--- Predictions for 20 Test Cases ---\n")
